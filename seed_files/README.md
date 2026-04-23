@@ -25,7 +25,7 @@ Database:  $0/month (DynamoDB on-demand, free tier covers all metadata)
 
 Customization Options
 ---------------------
-Ask Claude to help you with any of these:
+Prompt your AI assistant to help you with any of these:
   - Add a custom domain (e.g. drive.yourdomain.com)
   - Enable Google OAuth login instead of API key
   - Set up Dropbox / iCloud / Google Drive import
