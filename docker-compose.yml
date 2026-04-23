@@ -1,0 +1,15 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8082:8082"
+    environment:
+      - DRIVE_BUCKET=tokendrive-files-968146339428
+      - DRIVE_TABLE=tokendrive-index
+      - DRIVE_API_KEY=local-dev-key
+      - AWS_PROFILE=tokenburner
+      - AWS_REGION_NAME=us-west-2
+    volumes:
+      - ./app:/app/app
+      - ./static:/app/static
+      - ~/.aws:/root/.aws:ro

@@ -1,0 +1,7 @@
+flask>=3.0
+apig-wsgi>=2.18
+boto3>=1.34
+
+# migration scripts (not deployed to Lambda)
+dropbox>=12.0
+pillow>=12.0
