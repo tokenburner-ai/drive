@@ -88,7 +88,7 @@ docker compose up --build -d
 
 ```
 drive-dev/
-├── CLAUDE.md             # This file
+├── CONTEXT.md            # This file
 ├── app/
 │   ├── main.py           # Flask app entry point
 │   ├── drive_api.py      # All drive routes
@@ -116,34 +116,33 @@ drive-dev/
 | S3 | `tokendrive-files-{account}` | ~$0.023/GB/mo |
 | DynamoDB | `tokendrive-index` | $0/mo (free tier) |
 
-## Options — ask Claude to add any of these
+## Options
 
 ### Custom domain
 Add a subdomain like `drive.yourdomain.com`. Requires:
 - A Route53 hosted zone, OR a Cloudflare DNS CNAME
 - An ACM certificate for the domain
 
-Ask Claude: *"Add drive.yourdomain.com as a custom domain for the Token Drive"*
+Prompt your AI assistant: *"Add drive.yourdomain.com as a custom domain for the Token Drive"*
 
 ### Google OAuth login
 Replace the API key gate with Google Sign-In. Requires:
 - A Google OAuth client ID (console.cloud.google.com)
 - Adding `GOOGLE_CLIENT_ID` to the Lambda environment
 
-Ask Claude: *"Replace the API key auth with Google OAuth on the Token Drive"*
+Prompt your AI assistant: *"Replace the API key auth with Google OAuth on the Token Drive"*
 
 ### Dropbox import
 Pull all files from a Dropbox account into the drive.
-The `sync_cigar_lounge.py` pattern in this repo shows how to do it.
 
-Ask Claude: *"Set up a Dropbox import for the Token Drive"*
+Prompt your AI assistant: *"Set up a Dropbox import for the Token Drive"*
 
 ### S3 storage tiering
 Move older files to cheaper storage classes automatically.
 
-Ask Claude: *"Add S3 Intelligent-Tiering lifecycle rules to the drive bucket"*
+Prompt your AI assistant: *"Add S3 Intelligent-Tiering lifecycle rules to the drive bucket"*
 
 ### Read-only sharing
 Create a second API key with read-only access (no upload/delete).
 
-Ask Claude: *"Add a read-only API key to the Token Drive for family sharing"*
+Prompt your AI assistant: *"Add a read-only API key to the Token Drive for family sharing"*
