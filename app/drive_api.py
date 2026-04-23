@@ -44,7 +44,11 @@ def _require_key(f):
 
 
 def _s3():
-    return aws.get_client('s3')
+    return aws.get_session().client(
+        's3',
+        region_name='us-west-2',
+        endpoint_url='https://s3.us-west-2.amazonaws.com',
+    )
 
 
 def _table():
