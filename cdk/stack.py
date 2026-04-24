@@ -22,7 +22,7 @@ PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 
 
 class DriveStack(cdk.Stack):
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, *, name_suffix: str = "", **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         cdk.Tags.of(self).add("ManagedBy", "tokenburner")
@@ -32,7 +32,7 @@ class DriveStack(cdk.Stack):
         bucket = s3.Bucket(
             self,
             "DriveFiles",
-            bucket_name=f"tokendrive-files-{self.account}",
+            bucket_name=f"tokendrive-files-{self.account}{name_suffix}",
             versioned=True,
             lifecycle_rules=[
                 s3.LifecycleRule(
@@ -54,7 +54,7 @@ class DriveStack(cdk.Stack):
         table = dynamodb.Table(
             self,
             "DriveIndex",
-            table_name="tokendrive-index",
+            table_name=f"tokendrive-index{name_suffix}",
             partition_key=dynamodb.Attribute(name="pk", type=dynamodb.AttributeType.STRING),
             sort_key=dynamodb.Attribute(name="sk", type=dynamodb.AttributeType.STRING),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -65,7 +65,7 @@ class DriveStack(cdk.Stack):
         fn = _lambda.Function(
             self,
             "Handler",
-            function_name="tokenburner-drive",
+            function_name=f"tokenburner-drive{name_suffix}",
             runtime=_lambda.Runtime.PYTHON_3_12,
             architecture=_lambda.Architecture.ARM_64,
             handler="lambda_handler.handler",
@@ -142,7 +142,7 @@ class DriveStack(cdk.Stack):
         cdk.CfnOutput(self, "SetApiKeyCommand",
             value=(
                 f"aws lambda update-function-configuration "
-                f"--function-name tokenburner-drive "
+                f"--function-name tokenburner-drive{name_suffix} "
                 f"--environment 'Variables={{DRIVE_BUCKET={bucket.bucket_name},"
                 f"DRIVE_TABLE={table.table_name},"
                 f"DRIVE_API_KEY=YOUR_KEY_HERE}}'"
