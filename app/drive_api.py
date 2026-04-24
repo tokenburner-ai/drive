@@ -82,39 +82,6 @@ def docs_page():
     return render_template_string(SWAGGER_HTML)
 
 
-SWAGGER_HTML = '''<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>API Docs</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
-  <style>
-    body { margin: 0; background: #050508; }
-    #swagger-ui .swagger-ui { background: #050508; }
-    #swagger-ui .swagger-ui .topbar { background: #0d0d12; border-bottom: 1px solid #1a1a24; }
-    #swagger-ui .swagger-ui .info .title { color: #f0f0f0; }
-  </style>
-</head>
-<body>
-  <div id="swagger-ui"></div>
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-  <script>
-    SwaggerUIBundle({
-      spec: ''' + _OPENAPI_SPEC_JSON + ''',
-      dom_id: '#swagger-ui',
-      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
-      layout: 'BaseLayout',
-      requestInterceptor: function(req) {
-        const key = sessionStorage.getItem('drive_api_key') || new URLSearchParams(location.search).get('key') || '';
-        if (key) req.headers['X-Drive-Key'] = key;
-        return req;
-      },
-    });
-  </script>
-</body>
-</html>'''
-
 _OPENAPI_SPEC_JSON = '''
 {
   "openapi": "3.0.0",
@@ -183,6 +150,39 @@ _OPENAPI_SPEC_JSON = '''
   }
 }
 '''
+
+SWAGGER_HTML = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>API Docs</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    body { margin: 0; background: #050508; }
+    #swagger-ui .swagger-ui { background: #050508; }
+    #swagger-ui .swagger-ui .topbar { background: #0d0d12; border-bottom: 1px solid #1a1a24; }
+    #swagger-ui .swagger-ui .info .title { color: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({
+      spec: ''' + _OPENAPI_SPEC_JSON + ''',
+      dom_id: '#swagger-ui',
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+      layout: 'BaseLayout',
+      requestInterceptor: function(req) {
+        const key = sessionStorage.getItem('drive_api_key') || new URLSearchParams(location.search).get('key') || '';
+        if (key) req.headers['X-Drive-Key'] = key;
+        return req;
+      },
+    });
+  </script>
+</body>
+</html>'''
 
 
 # ── folder listing ────────────────────────────────────────────────────────────
