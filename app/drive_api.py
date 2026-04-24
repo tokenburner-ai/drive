@@ -13,7 +13,7 @@ import os
 import time
 from functools import wraps
 
-from flask import Blueprint, jsonify, redirect, request, send_from_directory
+from flask import Blueprint, jsonify, redirect, render_template_string, request, send_from_directory
 
 import aws
 
@@ -67,13 +67,122 @@ def _safe_prefix(prefix):
     return prefix
 
 
-# ── page ──────────────────────────────────────────────────────────────────────
+# ── pages ─────────────────────────────────────────────────────────────────────
 
 @drive_bp.route('/')
 @drive_bp.route('/drive/')
 def drive_page():
     from flask import current_app
     return send_from_directory(current_app.static_folder, 'drive.html')
+
+
+@drive_bp.route('/docs')
+@drive_bp.route('/docs/')
+def docs_page():
+    return render_template_string(SWAGGER_HTML)
+
+
+SWAGGER_HTML = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>API Docs</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    body { margin: 0; background: #050508; }
+    #swagger-ui .swagger-ui { background: #050508; }
+    #swagger-ui .swagger-ui .topbar { background: #0d0d12; border-bottom: 1px solid #1a1a24; }
+    #swagger-ui .swagger-ui .info .title { color: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({
+      spec: ''' + _OPENAPI_SPEC_JSON + ''',
+      dom_id: '#swagger-ui',
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+      layout: 'BaseLayout',
+      requestInterceptor: function(req) {
+        const key = sessionStorage.getItem('drive_api_key') || new URLSearchParams(location.search).get('key') || '';
+        if (key) req.headers['X-Drive-Key'] = key;
+        return req;
+      },
+    });
+  </script>
+</body>
+</html>'''
+
+_OPENAPI_SPEC_JSON = '''
+{
+  "openapi": "3.0.0",
+  "info": { "title": "Token Drive API", "version": "1.0" },
+  "servers": [{ "url": "/" }],
+  "components": {
+    "securitySchemes": {
+      "ApiKey": { "type": "apiKey", "in": "header", "name": "X-Drive-Key" }
+    }
+  },
+  "security": [{ "ApiKey": [] }],
+  "paths": {
+    "/api/drive/list": {
+      "get": {
+        "summary": "List files and folders",
+        "parameters": [{ "name": "prefix", "in": "query", "schema": { "type": "string" }, "example": "drive/" }],
+        "responses": { "200": { "description": "File listing" }, "401": { "description": "Unauthorized" } }
+      }
+    },
+    "/api/drive/tree": {
+      "get": {
+        "summary": "Full folder tree",
+        "responses": { "200": { "description": "Tree JSON" }, "401": { "description": "Unauthorized" } }
+      }
+    },
+    "/api/drive/url": {
+      "get": {
+        "summary": "Presigned download URL",
+        "parameters": [{ "name": "key", "in": "query", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Presigned URL" }, "401": { "description": "Unauthorized" } }
+      }
+    },
+    "/api/drive/presign-upload": {
+      "post": {
+        "summary": "Presigned upload URL",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": {
+            "type": "object",
+            "properties": { "key": { "type": "string" }, "content_type": { "type": "string" } }
+          }}}
+        },
+        "responses": { "200": { "description": "Presigned URL + fields" }, "401": { "description": "Unauthorized" } }
+      }
+    },
+    "/api/drive/delete": {
+      "delete": {
+        "summary": "Delete a file",
+        "parameters": [{ "name": "key", "in": "query", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Deleted" }, "401": { "description": "Unauthorized" } }
+      }
+    },
+    "/api/drive/rename": {
+      "post": {
+        "summary": "Rename a file",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": {
+            "type": "object",
+            "properties": { "old_key": { "type": "string" }, "new_key": { "type": "string" } }
+          }}}
+        },
+        "responses": { "200": { "description": "Renamed" }, "401": { "description": "Unauthorized" } }
+      }
+    }
+  }
+}
+'''
 
 
 # ── folder listing ────────────────────────────────────────────────────────────
