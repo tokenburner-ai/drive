@@ -111,6 +111,8 @@ def drive_page():
 
 @drive_bp.route('/docs')
 @drive_bp.route('/docs/')
+@drive_bp.route('/drive/docs')
+@drive_bp.route('/drive/docs/')
 def docs_page():
     return render_template_string(SWAGGER_HTML)
 
