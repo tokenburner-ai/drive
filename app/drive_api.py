@@ -11,6 +11,7 @@ DynamoDB index (DRIVE_TABLE) provides sub-millisecond folder listings:
 import json
 import os
 import time
+from datetime import datetime, timezone
 from functools import wraps
 
 from flask import Blueprint, jsonify, redirect, render_template_string, request, send_from_directory
@@ -19,25 +20,57 @@ import aws
 
 drive_bp = Blueprint('drive_bp', __name__)
 
-DRIVE_BUCKET = os.environ.get('DRIVE_BUCKET', '')
-DRIVE_PREFIX = 'drive/'
-DRIVE_TABLE  = os.environ.get('DRIVE_TABLE', 'tokendrive-index')
-API_KEY_VAR  = os.environ.get('DRIVE_API_KEY', '')
+DRIVE_BUCKET    = os.environ.get('DRIVE_BUCKET', '')
+DRIVE_PREFIX    = 'drive/'
+DRIVE_TABLE     = os.environ.get('DRIVE_TABLE', 'tokendrive-index')
+API_KEYS_TABLE  = os.environ.get('API_KEYS_TABLE', 'tokenburner-api-keys')
 
 
 # ── auth ──────────────────────────────────────────────────────────────────────
 
+def _validate_api_key(key: str) -> bool:
+    """Validate sk_... key against tokenburner-api-keys DynamoDB table."""
+    if not key or not key.startswith('sk_'):
+        return False
+    try:
+        table = aws.get_session().resource('dynamodb').Table(API_KEYS_TABLE)
+        resp = table.get_item(Key={'key_id': key})
+        item = resp.get('Item')
+        if not item or not item.get('active', True):
+            return False
+        expires_at = item.get('expires_at')
+        if expires_at and datetime.fromisoformat(expires_at) < datetime.now(timezone.utc):
+            return False
+        try:
+            table.update_item(
+                Key={'key_id': key},
+                UpdateExpression='SET last_used_at = :now',
+                ExpressionAttributeValues={':now': datetime.now(timezone.utc).isoformat()},
+            )
+        except Exception:
+            pass
+        return True
+    except Exception:
+        return False
+
+
+def _extract_key() -> str:
+    auth = request.headers.get('Authorization', '')
+    if auth.startswith('Bearer sk_'):
+        return auth[7:]
+    key = request.headers.get('X-API-Key', '')
+    if key.startswith('sk_'):
+        return key
+    key = request.args.get('key', '')
+    if key.startswith('sk_'):
+        return key
+    return ''
+
+
 def _require_key(f):
-    """Check X-Drive-Key header or ?key= query param against DRIVE_API_KEY."""
     @wraps(f)
     def w(*a, **kw):
-        provided = (
-            request.headers.get('X-Drive-Key') or
-            request.args.get('key') or
-            request.cookies.get('drive_key') or
-            ''
-        )
-        if not API_KEY_VAR or provided != API_KEY_VAR:
+        if not _validate_api_key(_extract_key()):
             return jsonify({'error': 'Unauthorized'}), 401
         return f(*a, **kw)
     return w
@@ -89,7 +122,7 @@ _OPENAPI_SPEC_JSON = '''
   "servers": [{ "url": "/" }],
   "components": {
     "securitySchemes": {
-      "ApiKey": { "type": "apiKey", "in": "header", "name": "X-Drive-Key" }
+      "ApiKey": { "type": "apiKey", "in": "header", "name": "X-API-Key" }
     }
   },
   "security": [{ "ApiKey": [] }],
@@ -175,8 +208,8 @@ SWAGGER_HTML = '''<!DOCTYPE html>
       presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
       layout: 'BaseLayout',
       requestInterceptor: function(req) {
-        const key = sessionStorage.getItem('drive_api_key') || new URLSearchParams(location.search).get('key') || '';
-        if (key) req.headers['X-Drive-Key'] = key;
+        const key = sessionStorage.getItem('api_key') || new URLSearchParams(location.search).get('key') || '';
+        if (key) req.headers['X-API-Key'] = key;
         return req;
       },
     });
