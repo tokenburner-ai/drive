@@ -1,7 +1,7 @@
 """Token Drive Stack — Lambda + CloudFront + S3 + DynamoDB.
 
 Pre-requisite: tokenburner-base stack must be deployed.
-Imports: tokenburner-api-keys-table-name (not used directly, reserved for future auth options)
+Imports: tokenburner-api-keys-table-name / arn (shared API key auth)
 
 Cost: ~$0/mo idle. S3 storage + DynamoDB on-demand are the only variable costs.
 """
@@ -22,8 +22,20 @@ PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 
 
 class DriveStack(cdk.Stack):
-    def __init__(self, scope: Construct, construct_id: str, *, name_suffix: str = "", **kwargs) -> None:
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        *,
+        name_suffix: str = "",
+        api_keys_table_name: str | None = None,
+        api_keys_table_arn: str | None = None,
+        **kwargs,
+    ) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        api_keys_table_name = api_keys_table_name or cdk.Fn.import_value("tokenburner-api-keys-table-name")
+        api_keys_table_arn  = api_keys_table_arn  or cdk.Fn.import_value("tokenburner-api-keys-table-arn")
 
         cdk.Tags.of(self).add("ManagedBy", "tokenburner")
         cdk.Tags.of(self).add("tokenburner:stack", "drive")
@@ -88,9 +100,7 @@ class DriveStack(cdk.Stack):
             environment={
                 "DRIVE_BUCKET": bucket.bucket_name,
                 "DRIVE_TABLE": table.table_name,
-                # DRIVE_API_KEY is set post-deploy via AWS console or CLI
-                # (avoids storing the key in CDK/CloudFormation output)
-                "DRIVE_API_KEY": "",
+                "API_KEYS_TABLE": api_keys_table_name,
             },
         )
 
@@ -107,6 +117,14 @@ class DriveStack(cdk.Stack):
 
         # IAM: DynamoDB read/write on the index table
         table.grant_read_write_data(fn)
+
+        # IAM: DynamoDB read on the shared API keys table
+        fn.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem", "dynamodb:UpdateItem"],
+                resources=[api_keys_table_arn, f"{api_keys_table_arn}/index/*"],
+            )
+        )
 
         # Lambda function URL (CloudFront is the entry point)
         fn_url = fn.add_function_url(
@@ -138,14 +156,4 @@ class DriveStack(cdk.Stack):
         cdk.CfnOutput(self, "LambdaFunctionUrl",
             value=fn_url.url,
             description="Lambda function URL — use as origin for the website CloudFront distribution",
-        )
-        cdk.CfnOutput(self, "SetApiKeyCommand",
-            value=(
-                f"aws lambda update-function-configuration "
-                f"--function-name tokenburner-drive{name_suffix} "
-                f"--environment 'Variables={{DRIVE_BUCKET={bucket.bucket_name},"
-                f"DRIVE_TABLE={table.table_name},"
-                f"DRIVE_API_KEY=YOUR_KEY_HERE}}'"
-            ),
-            description="Run this command (with your chosen key) to set the API key",
         )

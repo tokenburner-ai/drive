@@ -184,7 +184,7 @@ header{display:flex;align-items:center;padding:0 20px;height:48px;background:#11
     <div class="gate-hint">
       You can also access the drive by appending your key to the URL:<br>
       <code>https://your-drive-url/?key=YOUR_API_KEY</code><br>
-      or set it in a request header: <code>X-Drive-Key: YOUR_API_KEY</code>
+      or set it in a request header: <code>X-API-Key: YOUR_API_KEY</code>
     </div>
   </div>
 </div>
@@ -270,7 +270,7 @@ header{display:flex;align-items:center;padding:0 20px;height:48px;background:#11
 // ── API key management ────────────────────────────────────────────────────────
 let DRIVE_KEY = '';
 
-const KEY_STORAGE = 'tokendrive_key';
+const KEY_STORAGE = 'api_key';
 
 function saveKey(k) {
   DRIVE_KEY = k;
@@ -285,7 +285,7 @@ function loadKey() {
 }
 
 async function api(url, opts) {
-  const headers = Object.assign({'X-Drive-Key': DRIVE_KEY}, (opts && opts.headers) || {});
+  const headers = Object.assign({'X-API-Key': DRIVE_KEY}, (opts && opts.headers) || {});
   const r = await fetch(url, Object.assign({}, opts, {headers}));
   const d = await r.json().catch(() => ({}));
   if (r.status === 401) { showGate(); throw new Error('Unauthorized'); }
@@ -815,7 +815,7 @@ document.getElementById('new-folder-btn').addEventListener('click', async () => 
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ key: placeholderKey, content_type: 'text/plain' }),
     });
-    await fetch(url, { method: 'PUT', body: '', headers: {'Content-Type': 'text/plain', 'X-Drive-Key': DRIVE_KEY} });
+    await fetch(url, { method: 'PUT', body: '', headers: {'Content-Type': 'text/plain', 'X-API-Key': DRIVE_KEY} });
     await api('/api/drive/index-file', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -959,7 +959,7 @@ async function startUploads(uploads) {
       pct.textContent = 'Done ✓';
       fetch('/api/drive/index-file', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-Drive-Key': DRIVE_KEY},
+        headers: {'Content-Type': 'application/json', 'X-API-Key': DRIVE_KEY},
         body: JSON.stringify({ key: u.key, size: u.file.size, last_modified: new Date().toISOString() }),
       }).catch(() => {});
     } catch(e) {
