@@ -135,6 +135,10 @@ class DriveStack(cdk.Stack):
             value=bucket.bucket_name,
             description="S3 bucket storing your files",
         )
+        cdk.CfnOutput(self, "LambdaFunctionUrl",
+            value=fn_url.url,
+            description="Lambda function URL — use as origin for the website CloudFront distribution",
+        )
         cdk.CfnOutput(self, "SetApiKeyCommand",
             value=(
                 f"aws lambda update-function-configuration "
