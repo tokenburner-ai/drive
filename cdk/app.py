@@ -12,6 +12,9 @@ env = cdk.Environment(
     region=os.environ.get("CDK_DEFAULT_REGION", "us-west-2"),
 )
 
-DriveStack(app, "tokenburner-drive", env=env)
+name_suffix = app.node.try_get_context("name_suffix") or ""
+stack_name = f"tokenburner-drive{name_suffix}"
+
+DriveStack(app, stack_name, env=env, name_suffix=name_suffix)
 
 app.synth()
