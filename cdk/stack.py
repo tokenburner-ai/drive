@@ -48,7 +48,7 @@ class DriveStack(cdk.Stack):
         bucket = s3.Bucket(
             self,
             "DriveFiles",
-            bucket_name=f"tokendrive-files-{self.account}{name_suffix}",
+            bucket_name=f"tokendrive-files-{self.account}-{self.region}{name_suffix}",
             versioned=True,
             lifecycle_rules=[
                 s3.LifecycleRule(
