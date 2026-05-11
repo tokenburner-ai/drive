@@ -15,6 +15,7 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_dynamodb as dynamodb,
     aws_iam as iam,
+    custom_resources as cr,
 )
 from constructs import Construct
 
@@ -36,9 +37,12 @@ class DriveStack(cdk.Stack):
 
         api_keys_table_name = api_keys_table_name or cdk.Fn.import_value("tokenburner-api-keys-table-name")
         api_keys_table_arn  = api_keys_table_arn  or cdk.Fn.import_value("tokenburner-api-keys-table-arn")
+        feature_registry_table_name = cdk.Fn.import_value("tokenburner-feature-registry-table-name")
+        feature_registry_table_arn  = cdk.Fn.import_value("tokenburner-feature-registry-table-arn")
 
         cdk.Tags.of(self).add("ManagedBy", "tokenburner")
         cdk.Tags.of(self).add("tokenburner:stack", "drive")
+        cdk.Tags.of(self).add("tokenburner:feature", "drive")
 
         # ── S3 bucket (file storage) ──────────────────────────────────────────
         bucket = s3.Bucket(
@@ -144,9 +148,65 @@ class DriveStack(cdk.Stack):
             ),
         )
 
+        # ── Self-register in feature registry ─────────────────────────────────
+        drive_url = f"https://{distribution.distribution_domain_name}"
+        register = cr.AwsCustomResource(
+            self,
+            "RegisterFeature",
+            on_create=cr.AwsSdkCall(
+                service="DynamoDB",
+                action="putItem",
+                physical_resource_id=cr.PhysicalResourceId.of("drive-registry"),
+                parameters={
+                    "TableName": feature_registry_table_name,
+                    "Item": {
+                        "name":         {"S": "drive"},
+                        "title":        {"S": "Token Drive"},
+                        "description": {"S": "Personal file storage on S3, fronted by a Lambda+CloudFront UI."},
+                        "url":          {"S": drive_url},
+                        "docs_url":     {"S": f"{drive_url}/docs"},
+                        "health_url":   {"S": f"{drive_url}/health"},
+                        "stack_name":   {"S": cdk.Aws.STACK_NAME},
+                    },
+                },
+            ),
+            on_update=cr.AwsSdkCall(
+                service="DynamoDB",
+                action="putItem",
+                physical_resource_id=cr.PhysicalResourceId.of("drive-registry"),
+                parameters={
+                    "TableName": feature_registry_table_name,
+                    "Item": {
+                        "name":         {"S": "drive"},
+                        "title":        {"S": "Token Drive"},
+                        "description": {"S": "Personal file storage on S3, fronted by a Lambda+CloudFront UI."},
+                        "url":          {"S": drive_url},
+                        "docs_url":     {"S": f"{drive_url}/docs"},
+                        "health_url":   {"S": f"{drive_url}/health"},
+                        "stack_name":   {"S": cdk.Aws.STACK_NAME},
+                    },
+                },
+            ),
+            on_delete=cr.AwsSdkCall(
+                service="DynamoDB",
+                action="deleteItem",
+                parameters={
+                    "TableName": feature_registry_table_name,
+                    "Key": {"name": {"S": "drive"}},
+                },
+            ),
+            policy=cr.AwsCustomResourcePolicy.from_statements([
+                iam.PolicyStatement(
+                    actions=["dynamodb:PutItem", "dynamodb:DeleteItem"],
+                    resources=[feature_registry_table_arn],
+                )
+            ]),
+        )
+        register.node.add_dependency(distribution)
+
         # ── Outputs ───────────────────────────────────────────────────────────
         cdk.CfnOutput(self, "DriveUrl",
-            value=f"https://{distribution.distribution_domain_name}",
+            value=drive_url,
             description="Token Drive URL — open this in your browser",
         )
         cdk.CfnOutput(self, "DriveBucket",

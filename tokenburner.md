@@ -3,9 +3,23 @@
 A personal file drive backed by S3 + DynamoDB, deployed as a Lambda + CloudFront stack.
 Zero idle cost. Runs entirely in your AWS account.
 
+Part of the tokenburner feature suite — authenticates against the shared
+`tokenburner-api-keys` DynamoDB table and self-registers in the shared
+feature-registry table so the tokenburner dashboard renders a card for it.
+
 ## Pre-requisites
 
-Before deploying, verify the tokenburner base stack is deployed:
+The tokenburner base stack must be deployed first. The easiest path:
+
+```bash
+git clone https://github.com/tokenburner-ai/stack.git
+cd stack
+python3 tokenburner.py install --features drive
+```
+
+That deploys the base stack + drive in one shot.
+
+To verify manually:
 
 ```bash
 AWS_PROFILE=tokenburner aws cloudformation describe-stacks \
@@ -13,11 +27,9 @@ AWS_PROFILE=tokenburner aws cloudformation describe-stacks \
   --query 'Stacks[0].StackStatus' --output text
 ```
 
-Expected: `CREATE_COMPLETE` or `UPDATE_COMPLETE`
+Expected: `CREATE_COMPLETE` or `UPDATE_COMPLETE`.
 
-If not deployed, see https://github.com/tokenburner-ai/stack
-
-## Deploy
+## Deploy standalone
 
 ```bash
 cd cdk
@@ -29,40 +41,41 @@ AWS_PROFILE=tokenburner \
   npx cdk deploy tokenburner-drive --require-approval never
 ```
 
-The deploy takes ~2 minutes. When it completes, copy the `DriveUrl` output — that is your drive URL.
+The deploy takes ~2 minutes. On success the stack self-registers in
+`tokenburner-feature-registry`, so the base-stack dashboard will show a
+Drive card automatically.
 
-## Set your API key
+## Authentication
 
-The drive ships with an empty API key (open access after deploy). Set a key immediately:
+Drive uses the shared `tokenburner-api-keys` DynamoDB table — the same table
+the dashboard, chat, forums, and agent features use. Create keys with the
+base-stack CLI:
 
 ```bash
-AWS_PROFILE=tokenburner aws lambda update-function-configuration \
-  --function-name tokenburner-drive \
-  --environment "Variables={
-    DRIVE_BUCKET=tokendrive-files-YOUR_ACCOUNT_ID,
-    DRIVE_TABLE=tokendrive-index,
-    DRIVE_API_KEY=your-secret-key-here
-  }"
+cd ../stack/base-stack
+python3 manage_keys.py create "My App" --email you@example.com --permissions read write
 ```
 
-Choose any string as your key. A UUID works well:
-```bash
-python3 -c "import uuid; print(uuid.uuid4())"
-```
+Or simply use the bootstrap admin key surfaced as a CFN output on the base
+stack (`BootstrapApiKey`). `tokenburner install` prints it and caches it at
+`~/.tokenburner/credentials`.
 
 ## Access the drive
 
-Open your `DriveUrl` in a browser. You'll see the key gate — paste your API key.
+Open the `DriveUrl` CFN output in a browser. You'll see the key gate —
+paste any valid `sk_...` key from the shared api-keys table.
 
-The key is stored in `sessionStorage` for the browser session. To stay logged in across sessions, bookmark the URL with your key appended:
+The key is stored in `sessionStorage` for the browser session. To stay
+logged in across sessions, bookmark the URL with your key appended:
 
 ```
-https://YOUR_CLOUDFRONT_DOMAIN/?key=YOUR_API_KEY
+https://YOUR_CLOUDFRONT_DOMAIN/?key=sk_YOUR_KEY
 ```
 
 Or pass it as a header for programmatic access:
 ```
-X-Drive-Key: YOUR_API_KEY
+X-API-Key: sk_YOUR_KEY
+Authorization: Bearer sk_YOUR_KEY
 ```
 
 ## Seed files
@@ -81,14 +94,17 @@ You can delete them from the UI whenever you like.
 ```bash
 docker compose up --build -d
 # Drive at http://localhost:8082
-# Set DRIVE_API_KEY in docker-compose.yml for local auth
 ```
+
+Local auth still hits the real shared `tokenburner-api-keys` DynamoDB table
+via your AWS profile (mounted read-only into the container). Any valid
+`sk_...` key works. There is no longer a separate local-only API key.
 
 ## File structure
 
 ```
-drive-dev/
-├── CONTEXT.md            # This file
+drive/
+├── tokenburner.md        # This file
 ├── app/
 │   ├── main.py           # Flask app entry point
 │   ├── drive_api.py      # All drive routes

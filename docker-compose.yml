@@ -4,9 +4,9 @@ services:
     ports:
       - "8082:8082"
     environment:
-      - DRIVE_BUCKET=tokendrive-files-YOUR_ACCOUNT_ID
+      - DRIVE_BUCKET=${DRIVE_BUCKET:-tokendrive-files-local}
       - DRIVE_TABLE=tokendrive-index
-      - DRIVE_API_KEY=local-dev-key
+      - API_KEYS_TABLE=tokenburner-api-keys
       - AWS_PROFILE=tokenburner
       - AWS_REGION_NAME=us-west-2
     volumes:
