@@ -14,6 +14,7 @@ import time
 from datetime import datetime, timezone
 from functools import wraps
 
+from botocore.config import Config
 from flask import Blueprint, jsonify, redirect, render_template_string, request, send_from_directory
 
 import aws
@@ -77,7 +78,20 @@ def _require_key(f):
 
 
 def _s3():
-    return aws.get_session().client('s3')
+    # Pin the regional S3 endpoint and SigV4 so presigned URLs point straight at
+    # the bucket's region. Against the default global endpoint, S3 answers a 307
+    # redirect to the regional host while a newly created bucket's name is still
+    # propagating, which outside us-east-1 covers the period right after install.
+    # boto3 and curl -L follow that redirect, but a browser cannot follow a
+    # cross-origin 307 PUT, so uploads from the Drive UI fail with
+    # "TypeError: Failed to fetch" until propagation completes.
+    session = aws.get_session()
+    region = session.region_name or os.environ.get('AWS_REGION', 'us-west-2')
+    return session.client(
+        's3',
+        endpoint_url=f'https://s3.{region}.amazonaws.com',
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'virtual'}),
+    )
 
 
 def _table():
