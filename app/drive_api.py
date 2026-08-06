@@ -14,6 +14,7 @@ import time
 from datetime import datetime, timezone
 from functools import wraps
 
+from botocore.config import Config
 from flask import Blueprint, jsonify, redirect, render_template_string, request, send_from_directory
 
 import aws
@@ -77,7 +78,27 @@ def _require_key(f):
 
 
 def _s3():
-    return aws.get_session().client('s3')
+    # Pin the regional S3 endpoint and SigV4 so presigned URLs point straight at
+    # the bucket's region. Against the default global endpoint, a bucket whose
+    # name is still propagating does not resolve there yet: in us-west-2 S3
+    # answers a 307 redirect to the regional host, and other regions can reject
+    # the request outright. boto3 and curl -L follow the redirect, but a browser
+    # will not follow a cross-origin redirect on a PUT with a body, so uploads
+    # from the Drive UI fail with "TypeError: Failed to fetch" until the name
+    # has propagated. Addressing the region directly avoids the whole window.
+    session = aws.get_session()
+    region = session.region_name
+    # Ask botocore to resolve the regional host rather than assembling it, so
+    # partitions with a different suffix (China uses amazonaws.com.cn) stay
+    # correct. Buckets whose names contain dots fall back to path style on
+    # their own, which keeps TLS validation working.
+    resolver = session._session.get_component('endpoint_resolver')
+    hostname = resolver.construct_endpoint('s3', region)['hostname']
+    return session.client(
+        's3',
+        endpoint_url=f'https://{hostname}',
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'virtual'}),
+    )
 
 
 def _table():
