@@ -79,17 +79,24 @@ def _require_key(f):
 
 def _s3():
     # Pin the regional S3 endpoint and SigV4 so presigned URLs point straight at
-    # the bucket's region. Against the default global endpoint, S3 answers a 307
-    # redirect to the regional host while a newly created bucket's name is still
-    # propagating, which outside us-east-1 covers the period right after install.
-    # boto3 and curl -L follow that redirect, but a browser cannot follow a
-    # cross-origin 307 PUT, so uploads from the Drive UI fail with
-    # "TypeError: Failed to fetch" until propagation completes.
+    # the bucket's region. Against the default global endpoint, a bucket whose
+    # name is still propagating does not resolve there yet: in us-west-2 S3
+    # answers a 307 redirect to the regional host, and other regions can reject
+    # the request outright. boto3 and curl -L follow the redirect, but a browser
+    # will not follow a cross-origin redirect on a PUT with a body, so uploads
+    # from the Drive UI fail with "TypeError: Failed to fetch" until the name
+    # has propagated. Addressing the region directly avoids the whole window.
     session = aws.get_session()
-    region = session.region_name or os.environ.get('AWS_REGION', 'us-west-2')
+    region = session.region_name
+    # Ask botocore to resolve the regional host rather than assembling it, so
+    # partitions with a different suffix (China uses amazonaws.com.cn) stay
+    # correct. Buckets whose names contain dots fall back to path style on
+    # their own, which keeps TLS validation working.
+    resolver = session._session.get_component('endpoint_resolver')
+    hostname = resolver.construct_endpoint('s3', region)['hostname']
     return session.client(
         's3',
-        endpoint_url=f'https://s3.{region}.amazonaws.com',
+        endpoint_url=f'https://{hostname}',
         config=Config(signature_version='s3v4', s3={'addressing_style': 'virtual'}),
     )
 
